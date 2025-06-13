@@ -1,35 +1,42 @@
-const addClassModal = document.getElementById("addTaskModal");
-const openModalBtn = document.getElementById("add-btn");
-const closeModalBtn = document.getElementById("modal-close");
-const addTaskForm = document.querySelector(".todo-app-form");
-const searchInput = document.querySelector(".search-input");
+const $ = document.querySelector.bind(document)
+const $$ = document.querySelectorAll.bind(document)
 
-const todos = JSON.parse(localStorage.getItem("todos")) ?? [];
-let todoList = todos.filter(item => item.isCompleted === false); // Filter out completed tasks
+const addClassModal = $("#addTaskModal");
+const removeClassModal = $("#confirmDeleteTaskModal");
+const openModalBtn = $("#add-btn");
+const closeModalBtn = $("#modal-close");
+const addTaskForm = $(".todo-app-form");
+const searchInput = $(".search-input");
 
-let completedTasks = todos.filter(item => item.isCompleted === true); // Filter out active tasks
+updateTodos();
 
 // Render the todo list from localStorage
 window.onload = function() {
-  renderTasks(todoList);
+  renderTasks(todos);
 };
 
 
 searchInput.addEventListener("keyup", function() {
   const searchTerm = searchInput.value.toLowerCase();
-  const tabButton = document.querySelector('.tab-button.active');
-  const filteredTasks = tabButton.textContent.trim() === 'Active Tasks' 
-    ? todoList.filter(item => item.title.toLowerCase().includes(searchTerm))
-    : completedTasks.filter(item => item.title.toLowerCase().includes(searchTerm));
+  switchAllTasksTab();
+
+  const filteredTasks = todos.filter(item => {
+    return item.title.toLowerCase().includes(searchTerm) || item.description.toLowerCase().includes(searchTerm);
+  });
+
   renderTasks(filteredTasks);
 });
 
 const clickRenderTab = (type, event) => {
-  const tabButtons = document.querySelectorAll('.tab-button');
+  const tabButtons = $$('.tab-button');
   tabButtons.forEach(button => button.classList.remove('active'));
   event.currentTarget.classList.add('active');
-
-  type === 'active' ? renderTasks(todoList) : renderTasks(completedTasks);
+  if(type === "all")
+    renderTasks(todos);
+  if(type === 'activated')
+    renderTasks(todoList);
+  if(type === 'completed')
+    renderTasks(completedTasks);
 };
 
 const renderTasks = (list) => {
@@ -54,11 +61,11 @@ const renderTasks = (list) => {
                             </div>
                             <div
                               class="dropdown-item complete"
-                              onclick="markAsActive('${item.id}', '${item.isCompleted ? "completed" : "active"}')">
+                              onclick="markAsActive('${item.id}')">
                                 <i class="fa-solid fa-check fa-icon"></i>
                                 Mark as ${!item.isCompleted ? 'Completed' : 'Active'}
                             </div>
-                            <div class="dropdown-item delete" onclick="removeTask('${item.id}', '${item.isCompleted ? "completed" : "active"}')">
+                            <div class="dropdown-item delete" onclick="removeTask('${item.id}')">
                                 <i class="fa-solid fa-trash fa-icon"></i>
                                 Delete
                             </div>
@@ -73,45 +80,35 @@ const renderTasks = (list) => {
 }
 
 
-function addTask(event) {
+function addTask(event, id) {
   event.preventDefault();
-  
-  let title = document.getElementById("taskTitle").value;
-  let description = document.getElementById("taskDescription").value;
-  let category = document.getElementById("taskCategory").value;
-  let priority = document.getElementById("taskPriority").value;
-  let startTime = document.getElementById("startTime").value;
-  let endTime = document.getElementById("endTime").value;
-  let dueDate = document.getElementById("taskDate").value;
-  let cardColor = document.getElementById("taskColor").value;
 
-  if (!title || !description || !category || !priority || !startTime || !endTime || !dueDate) {
+  const task = {
+    id: id ? id : 'id' + (new Date()).getTime(),
+    title: $("#taskTitle").value,
+    description: $("#taskDescription").value,
+    category: $("#taskCategory").value,
+    priority: $("#taskPriority").value,
+    startTime: $("#startTime").value,
+    endTime: $("#endTime").value,
+    dueDate: $("#taskDate").value,
+    cardColor: $("#taskColor").value,
+    isCompleted: false
+  };
+  if (!task.title || !task.description || !task.category || !task.priority || !task.startTime || !task.endTime || !task.dueDate) {
     alert("Please fill in all fields.");
     return;
   }
+  id
+    ? todos = todos.map(item => item.id === id ? task : item)
+    : todos.unshift(task);
+    localStorage.setItem("todos", JSON.stringify(todos));
+  updateTodos();
 
-  const newTask = {
-    id: 'id' + (new Date()).getTime(),
-    title,
-    description,
-    category,
-    priority,
-    startTime,
-    endTime,
-    dueDate,
-    cardColor,
-    isCompleted: false
-  };
+  switchAllTasksTab();
+  renderTasks(todos);
+  closeModal(event);
 
-  todoList.unshift(newTask);
-  localStorage.setItem("todos", JSON.stringify(todoList.concat(completedTasks)));
-
-  const tabButtons = document.querySelectorAll('.tab-button');
-  tabButtons.forEach(button => button.classList.remove('active'));
-  tabButtons[0].classList.add('active');
-
-  renderTasks(todoList);
-  closeModal();
 }
 
 function showDropdown(event) {
@@ -122,125 +119,90 @@ function showDropdown(event) {
     if (!event.target.closest('.task-menu'))
       dropdownMenu.style.display = 'none';
   }
-  // Close the dropdown if clicked outside
-  document.addEventListener('click', show);
-  document.removeEventListener('click', show);
 }
 
 function showEditTask(id) {
   const task = todoList.find(item => item.id === id);
   if (task && task.isCompleted === false) {
     openModal("edit", id);
-    
-    document.getElementById("taskTitle").value = task.title;
-    document.getElementById("taskDescription").value = task.description;
-    document.getElementById("taskCategory").value = task.category;
-    document.getElementById("taskPriority").value = task.priority;
-    document.getElementById("startTime").value = task.startTime;
-    document.getElementById("endTime").value = task.endTime;
-    document.getElementById("taskDate").value = task.dueDate;
-    document.getElementById("taskColor").value = task.cardColor;
+
+    $("#taskTitle").value = task.title;
+    $("#taskDescription").value = task.description;
+    $("#taskCategory").value = task.category;
+    $("#taskPriority").value = task.priority;
+    $("#startTime").value = task.startTime;
+    $("#endTime").value = task.endTime;
+    $("#taskDate").value = task.dueDate;
+    $("#taskColor").value = task.cardColor;
   } else {
     alert("Task not found or already completed.");
   }
 }
 
-function updateTask(event, id) {
-  event.preventDefault();
+function markAsActive(id) {
+  let item = todos.find(item => item.id === id);
+  item.isCompleted = !item.isCompleted;
+  localStorage.setItem("todos", JSON.stringify(todos));
+  updateTodos();
+  switchAllTasksTab();
+  renderTasks(todos);
+}
+
+function removeTask(id) {
+  removeClassModal.className = "modal-overlay show";
+  let modalTitle = removeClassModal.querySelector(".modal-title");
+  let modalFooter = removeClassModal.querySelector(".modal-footer");
   
-  let title = document.getElementById("taskTitle").value;
-  let description = document.getElementById("taskDescription").value;
-  let category = document.getElementById("taskCategory").value;
-  let priority = document.getElementById("taskPriority").value;
-  let startTime = document.getElementById("startTime").value;
-  let endTime = document.getElementById("endTime").value;
-  let dueDate = document.getElementById("taskDate").value;
-  let cardColor = document.getElementById("taskColor").value;
-
-  if (!title || !description || !category || !priority || !startTime || !endTime || !dueDate || !cardColor) {
-    alert("Please fill in all fields.");
-    return;
-  }
-
-  const updatedTask = {
-    id: id,
-    title,
-    description,
-    category,
-    priority,
-    startTime,
-    endTime,
-    dueDate,
-    cardColor,
-    isCompleted: false
-  };
-
-  todoList = todoList.map(item => item.id === id ? updatedTask : item);
-  localStorage.setItem("todos", JSON.stringify(todoList.concat(completedTasks)));
+  modalTitle.textContent = "Delete Task ?";
+  modalFooter.innerHTML = `
+        <button class="btn btn-danger" onclick="confirmDeleteTask('${id}')">Delete</button>
+        <button type="button" class="btn btn-secondary" onclick="closeModal(event)">Cancel</button>
+    `;
   
-  renderTasks(todoList);
-  closeModal();
 }
 
-function markAsActive(id, type) {
-  if(type === "active") {
-    let task = todoList.find(item => item.id === id);
-    task.isCompleted = true;
-    completedTasks.unshift(task);
-    todoList = todoList.filter(item => item.id !== id);
-    renderTasks(todoList);
-  } else{
-    let task = completedTasks.find(item => item.id === id);
-    task.isCompleted = false;
-    todoList.unshift(task);
-    completedTasks = completedTasks.filter(item => item.id !== id);
-    renderTasks(completedTasks);
-  }
-  localStorage.setItem("todos", JSON.stringify(todoList.concat(completedTasks)));
+function confirmDeleteTask(id){
+  todos = todos.filter(item => item.id !== id)
+  localStorage.setItem("todos", JSON.stringify(todos));
+  updateTodos();
+  switchAllTasksTab();
+  renderTasks(todos);
+  removeClassModal.className = "modal-overlay";
 }
 
-function removeTask(id, type) {
-  type === "active"
-    ? todoList = todoList.filter(item => item.id !== id)
-    : completedTasks = completedTasks.filter(item => item.id !== id);
-  localStorage.setItem("todos", JSON.stringify(todoList.concat(completedTasks)));
-  type === "active" ? renderTasks(todoList) : renderTasks(completedTasks);
+const switchAllTasksTab = () => {
+  const tabButtons = $$('.tab-button');
+  tabButtons.forEach(button => button.classList.remove('active'));
+  tabButtons[0].classList.add('active');
 }
-
 
 function openModal(type, taskId) {
   addClassModal.className = "modal-overlay show";
   let modalTitle = addClassModal.querySelector(".modal-title");
   let modalFooter = addClassModal.querySelector(".modal-footer");
-  if (type === "edit" && taskId) {
-    modalTitle.textContent = "Edit Task";
-    modalFooter.innerHTML = `
-          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary" onclick="updateTask(event,'${taskId}')">Update Task</button>
-    `;
-  } else {
-    modalTitle.textContent = "Add New Task";
-    modalFooter.innerHTML = `
-          <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary" onclick="addTask(event)">Create Task</button>
+  modalTitle.textContent = type === "edit" ? "Edit Task" : "Add New Task";
+  modalFooter.innerHTML = `
+          <button type="button" class="btn btn-secondary" onclick="closeModal(event)">Cancel</button>
+          ${ type === "edit"
+            ? `<button type="submit" class="btn btn-primary" onclick="addTask(event,'${taskId}')">Update Task</button>`
+            : `<button type="submit" class="btn btn-primary" onclick="addTask(event)">Create Task</button>`
+          }
     `;
 
-    setTimeout(() => {
-      let taskTitle = document.getElementById("taskTitle");
-      if (taskTitle) taskTitle.focus();
-    }, 100);
-  }
-  addClassModal.addEventListener('click', function(event) {
-    if (!event.target.closest('.modal'))
-      closeModal();
-  });
-  document.removeEventListener('click', function(event) {
-    if (!event.target.closest('.modal'))
-      closeModal();
-  });
+  setTimeout(() => {
+    let taskTitle = $("#taskTitle");
+    if (taskTitle) taskTitle.focus();
+  }, 100);
 }
 
-function closeModal() {
-  addClassModal.className = "modal-overlay";
-  addTaskForm.reset();
+function updateTodos(){
+  todos = JSON.parse(localStorage.getItem("todos")) ?? [];
+  completedTasks = todos.filter(item => item.isCompleted === true)
+  todoList = todos.filter(item => item.isCompleted === false)
+}
+
+function closeModal(e) {
+  let element = e.target.closest(".modal-overlay")
+  element.className = "modal-overlay";
+  if(element.id = "addTaskModal") addTaskForm.reset();
 }
