@@ -44,8 +44,14 @@ const renderTasks = (list) => {
   listTasks.innerHTML = '';
 
   if (list.length === 0) {
-    listTasks.innerHTML = '<p class="no-tasks">No tasks available</p>';
+    listTasks.style.display= "flex";
+    listTasks.style.justifyContent= "center";
+    listTasks.innerHTML = `<div class="no-tasks">
+      <img src="./notfound.png"/>
+    </div>`;
     return;
+  } else {
+    listTasks.style.display= "grid";
   }
   // Render each task
   list.forEach(item => {
@@ -96,14 +102,22 @@ function addTask(event, id) {
     isCompleted: false
   };
   if (!task.title || !task.description || !task.category || !task.priority || !task.startTime || !task.endTime || !task.dueDate) {
-    alert("Please fill in all fields.");
+    toastAlert("error", "Please fill in all fields!");
     return;
+  }
+  if(!id){
+    let isDone = todos.find(item => item.title ===task.title) || todos.find(item => item.description ===task.description)
+    if(isDone) {
+      toastAlert("error", "Duplicate name or description!");
+      return;
+    }
   }
   id
     ? todos = todos.map(item => item.id === id ? task : item)
     : todos.unshift(task);
-    localStorage.setItem("todos", JSON.stringify(todos));
+  localStorage.setItem("todos", JSON.stringify(todos));
   updateTodos();
+  toastAlert("success", "Congratulation, create successed!");
 
   switchAllTasksTab();
   renderTasks(todos);
@@ -135,7 +149,7 @@ function showEditTask(id) {
     $("#taskDate").value = task.dueDate;
     $("#taskColor").value = task.cardColor;
   } else {
-    alert("Task not found or already completed.");
+    toastAlert("error", "Task not found or already completed.");
   }
 }
 
@@ -205,4 +219,17 @@ function closeModal(e) {
   let element = e.target.closest(".modal-overlay")
   element.className = "modal-overlay";
   if(element.id = "addTaskModal") addTaskForm.reset();
+}
+
+function toastAlert(type, message){
+  let element = document.createElement("div");
+  element.classList = `toast toast-${type}`
+  element.innerHTML = `
+        <div class="toast-header toast-${type}-header">${type.toUpperCase()}</div>
+        <div class="toast-footer toast-${type}-footer">${message}</div>
+    `
+  document.body.appendChild(element);
+  setTimeout(()=> {
+    element.remove();
+  }, 2000);
 }
